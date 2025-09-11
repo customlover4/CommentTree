@@ -2,17 +2,17 @@ package storage
 
 import "CommentTree/internal/entities/comment"
 
-type DB interface {
+type db interface {
 	Create(c comment.Comment) (int64, error)
 	Comments(id int64) ([]comment.Comment, error)
 	Delete(id int64) error
 }
 
 type CommentStorage struct {
-	db DB
+	db
 }
 
-func NewComment(db DB) *CommentStorage {
+func NewComment(db db) *CommentStorage {
 	return &CommentStorage{
 		db: db,
 	}
