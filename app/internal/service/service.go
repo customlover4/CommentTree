@@ -4,7 +4,7 @@ import "CommentTree/internal/entities/comment"
 
 type storage interface {
 	Create(c comment.Comment) (int64, error)
-	Comments(id int64) ([]comment.Comment, error)
+	Comments(id int64, opts *comment.GetterOpts) ([]comment.Comment, error)
 	Delete(id int64) error
 }
 
