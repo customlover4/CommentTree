@@ -1,6 +1,1 @@
-postgres:
-  host: "postgres"
-  port: "5432"
-  username: "dev"
-  dbname: "test"
-  sslmode: "disable"
+debug: true
