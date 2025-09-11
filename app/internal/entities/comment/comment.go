@@ -5,3 +5,8 @@ type Comment struct {
 	Message  string
 	ParentID int64
 }
+
+type GetterOpts struct {
+	Page   int    `form:"page"`
+	Substr string `form:"substr"`
+}
