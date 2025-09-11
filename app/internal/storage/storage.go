@@ -12,7 +12,7 @@ type Storage struct {
 	db
 }
 
-func NewComments(db db) *Storage {
+func New(db db) *Storage {
 	return &Storage{
 		db: db,
 	}
