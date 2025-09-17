@@ -5,8 +5,8 @@ import (
 	"CommentTree/pkg/errs"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"strconv"
 )
 
 func (p *Postgres) Create(c comment.Comment) (int64, error) {
@@ -18,14 +18,15 @@ func (p *Postgres) Create(c comment.Comment) (int64, error) {
 	)
 
 	// if we don't have parent id, we will insert NULL to db
-	parentID := false
-	if c.ParentID > 0 {
-		parentID = true
+	haveParentID := (c.ParentID > 0)
+	parentIDArg := sql.NullInt64{
+		Int64: c.ParentID, Valid: haveParentID,
 	}
-	parentIDArg := sql.NullInt64{Int64: c.ParentID, Valid: parentID}
 
 	var id int64
-	err := p.db.Master.QueryRow(q, c.Message, parentIDArg).Scan(&id)
+	err := p.db.Master.QueryRowContext(
+		context.Background(), q, c.Message, parentIDArg,
+	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
@@ -33,74 +34,96 @@ func (p *Postgres) Create(c comment.Comment) (int64, error) {
 	return id, nil
 }
 
-func (p *Postgres) generateAgrigatedOpts(id int64, opts *comment.GetterOpts) ([]any, string) {
+func (p *Postgres) generateAgrigatedOpts(parentID int64, opts *comment.GetterOpts) ([]any, string) {
+	if opts != nil && opts.Empty() {
+		opts = nil
+	}
+
 	args := make([]any, 0, 10)
-	argsStr := ""
+	argsStr := fmt.Sprintf(`
+		select * from %s
+	`, CommentsTable)
 
-	if id <= 0 && opts == nil {
-		return nil, ""
-	} else if id > 0 && opts == nil {
-		argsStr += " where id = $1 or parent_id = $2"
-		args = append(args, id, id)
-		return args, argsStr
-	} else if opts != nil {
-		tmp := " where"
-		i := 1
-
-		if id > 0 {
-			tmp = fmt.Sprintf(" (id = $%d", i)
-			args = append(args, id)
-			i++
-
-			if opts.Substr != "" {
-				tmp += fmt.Sprintf(" and POSITION($%d IN message) > 0", i)
-				args = append(args, opts.Substr)
-				i++
-			}
-
-			tmp += ") or parent_id = $" + strconv.Itoa(i)
-			args = append(args, id)
-			i++
+	if opts == nil {
+		if parentID <= 0 {
+			argsStr += " where parent_id is NULL"
+			return args, argsStr
 		} else {
-			if opts.Substr != "" {
-				tmp += fmt.Sprintf(" POSITION($%d IN message) > 0", i)
-				args = append(args, opts.Substr)
-				i++
-			}
+			argsStr += " where parent_id = $1"
+			args = append(args, parentID)
+			return args, argsStr
 		}
+	}
 
-		argsStr += tmp
-		if opts.Page > 0 {
-			// 1(PageElement) * 1(opts.Page is first) = 1, wrong offset for first page
-			opts.Page--
-			limit := PageElements
-			offset := PageElements * opts.Page
+	argIDX := 1
 
-			argsStr += fmt.Sprintf(" limit %d offset %d", limit, offset)
-		}
+	if parentID > 0 {
+		argsStr += fmt.Sprintf(" where parent_id = $%d", argIDX)
+		args = append(args, parentID)
+		argIDX++
+	} else {
+		argsStr += " where parent_id is NULL"
+	}
+
+	if opts.Substr != "" {
+		argsStr += fmt.Sprintf(" and POSITION($%d IN message) > 0", argIDX)
+		args = append(args, opts.Substr)
+	}
+
+	if opts.Page > 0 {
+		// 1(PageElement) * 1(opts.Page is first) = 1, wrong offset for first page
+		opts.Page--
+		limit := PageElements
+		offset := PageElements * opts.Page
+
+		argsStr += fmt.Sprintf(" limit %d offset %d", limit, offset)
 	}
 
 	return args, argsStr
 }
 
-func (p *Postgres) Comments(id int64, opts *comment.GetterOpts) ([]comment.Comment, error) {
-	const op = "internal.storage.postgres.comments.Comments"
+func (p *Postgres) Parent(id int64) (comment.Comment, error) {
+	const op = "internal.storage.postgres.comments.parent"
 
-	q := fmt.Sprintf(`
-		select * from %s
-	`, CommentsTable)
+	qParent := fmt.Sprintf(`select * from %s where id = $1`, CommentsTable)
 
-	var args []any
+	var parent comment.Comment
+	var nullID sql.NullInt64
 
-	argsAppend, qAppend := p.generateAgrigatedOpts(id, opts)
-	args = argsAppend
-	q += qAppend
+	err := p.db.Master.QueryRowContext(context.Background(), qParent, id).
+		Scan(&parent.ID, &parent.Message, &nullID)
 
+	if errors.Is(err, sql.ErrNoRows) {
+		return comment.Comment{}, errs.ErrDBNotFound
+	} else if err != nil {
+		return comment.Comment{}, fmt.Errorf("%s: %w", op, err)
+	}
+
+	if nullID.Valid {
+		parent.ParentID = nullID.Int64
+	}
+
+	return parent, nil
+}
+
+func (p *Postgres) Childs(parentID int64, opts *comment.GetterOpts) ([]comment.Comment, error) {
+	const op = "internal.storage.postgres.comments.childs"
+
+	args, q := p.generateAgrigatedOpts(parentID, opts)
 	rows, err := p.db.QueryWithRetry(
 		context.Background(), retryOpts,
 		q, args...,
 	)
 	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	defer func() {
+		_ = rows.Close()
+	}()
+	if errors.Is(rows.Err(), sql.ErrNoRows) {
+		return nil, errs.ErrDBNotFound
+	} else if rows.Err() != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
@@ -120,9 +143,6 @@ func (p *Postgres) Comments(id int64, opts *comment.GetterOpts) ([]comment.Comme
 
 		coms = append(coms, tmp)
 	}
-	if len(coms) == 0 {
-		return nil, errs.ErrDBNotFound
-	}
 
 	return coms, nil
 }
@@ -140,9 +160,6 @@ func (p *Postgres) Delete(id int64) error {
 	if affected, err := res.RowsAffected(); err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	} else if affected == 0 {
-		// with this specific err we can show upper layer,
-		// what we wont log this error and can handle this error
-		// like specific case in handlers (503 or 404)
 		return errs.ErrDBNotAffected
 	}
 
