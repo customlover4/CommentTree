@@ -7,8 +7,8 @@ type Comment struct {
 }
 
 type CommentView struct {
-	ParentComment Comment
-	Childs        []Comment
+	Parent Comment   `json:"parent"`
+	Childs []Comment `json:"childs"`
 }
 
 type GetterOpts struct {

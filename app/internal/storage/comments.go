@@ -43,8 +43,8 @@ func (s *Storage) Comments(parentID int64, opts *comment.GetterOpts) (*comment.C
 	}
 
 	return &comment.CommentView{
-		ParentComment: parent,
-		Childs:        childs,
+		Parent: parent,
+		Childs: childs,
 	}, nil
 }
 
