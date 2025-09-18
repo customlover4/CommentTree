@@ -79,6 +79,8 @@ func DeleteComment(s servicer) ginext.HandlerFunc {
 	return func(ctx *ginext.Context) {
 		const op = "internal.web.handlers.DeleteComment"
 
+		ctx.Header("Content-Type", "application/json")
+
 		idParam := ctx.Param("id")
 		id, err := strconv.ParseInt(idParam, 10, 64)
 		if err != nil {
