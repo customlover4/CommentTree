@@ -71,7 +71,7 @@ func CreateComment(s servicer) ginext.HandlerFunc {
 			return
 		}
 
-		ctx.JSON(http.StatusOK, response.OK(id))
+		ctx.JSON(http.StatusOK, response.Result(id))
 	}
 }
 
@@ -112,6 +112,6 @@ func DeleteComment(s servicer) ginext.HandlerFunc {
 			return
 		}
 
-		ctx.JSON(http.StatusOK, response.OK("ok"))
+		ctx.JSON(http.StatusOK, response.OK())
 	}
 }

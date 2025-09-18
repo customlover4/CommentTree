@@ -18,7 +18,13 @@ func Error(msg string) Response {
 	}
 }
 
-func OK(result any) Response {
+func OK() Response {
+	return Response{
+		Status: StatusOK,
+	}
+}
+
+func Result(result any) Response {
 	return Response{
 		Status: StatusOK,
 		Result: result,
