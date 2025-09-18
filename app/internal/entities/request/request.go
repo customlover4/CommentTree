@@ -15,15 +15,3 @@ func (cc *CreateComment) Validate() string {
 
 	return ""
 }
-
-type DeleteComment struct {
-	ID int64 `json:"id"`
-}
-
-func (dc *DeleteComment) Validate() string {
-	if dc.ID <= 0 {
-		return "wrong id"
-	}
-
-	return ""
-}

@@ -44,34 +44,3 @@ func TestCreateComment_Validate(t *testing.T) {
 		})
 	}
 }
-
-func TestDeleteComment_Validate(t *testing.T) {
-	tests := []struct {
-		name string // description of this test case
-		ID   int64
-		want bool
-	}{
-		{
-			name: "good",
-			ID:   2,
-			want: false,
-		},
-		{
-			name: "bad id",
-			ID:   -1,
-			want: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var dc DeleteComment
-			dc.ID = tt.ID
-			got := dc.Validate()
-			if tt.want && got == "" {
-				t.Errorf("Validate() = %v, want %T", got, tt.want)
-			} else if !tt.want && got != "" {
-				t.Errorf("Validate() = %v, want %T", got, tt.want)
-			}
-		})
-	}
-}
