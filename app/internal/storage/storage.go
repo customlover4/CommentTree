@@ -18,6 +18,7 @@ type db interface {
 	Delete(id int64) error
 
 	UnwrapError(err error) error
+	Shutdown()
 }
 
 type Storage struct {
@@ -28,4 +29,8 @@ func New(db db) *Storage {
 	return &Storage{
 		db: db,
 	}
+}
+
+func (s *Storage) Shutdown() {
+	s.db.Shutdown()
 }

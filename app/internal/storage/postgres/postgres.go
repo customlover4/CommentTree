@@ -70,3 +70,10 @@ func (p *Postgres) UnwrapError(err error) error {
 
 	return err
 }
+
+func (p *Postgres) Shutdown() {
+	_ = p.db.Master.Close()
+	for i := 0; i < len(p.db.Slaves); i++ {
+		_ = p.db.Slaves[i].Close()
+	}
+}
