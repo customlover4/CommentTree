@@ -54,7 +54,9 @@ func (s *Service) DeleteComment(id int64) error {
 
 	err := s.str.DeleteComment(id)
 	if errors.Is(err, storage.ErrNotAffected) {
-		return ErrNotAffected
+		return fmt.Errorf(
+			"%w: %s", ErrWrongData, "not find comment with this id",
+		)
 	} else if err != nil {
 		return fmt.Errorf("%s: (%w)%w", op, ErrStorageInternal, err)
 	}
