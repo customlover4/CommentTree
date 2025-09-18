@@ -44,3 +44,44 @@ func TestCreateComment_Validate(t *testing.T) {
 		})
 	}
 }
+
+func TestGetComments_Validate(t *testing.T) {
+	tests := []struct {
+		name     string // description of this test case
+		parentID int64
+		page     int
+		substr   string
+		want     bool
+	}{
+		{
+			name:     "good",
+			parentID: 0,
+			want:     false,
+		},
+		{
+			name:     "bad parent id",
+			parentID: -1,
+			want:     true,
+		},
+		{
+			name:     "bad page",
+			parentID: 0,
+			page:     -100,
+			want:     true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gc GetComments
+			gc.Substr = tt.substr
+			gc.ParentID = tt.parentID
+			gc.Page = tt.page
+			got := gc.Validate()
+			if tt.want && got == "" {
+				t.Errorf("Validate() = %v, want %T", got, tt.want)
+			} else if !tt.want && got != "" {
+				t.Errorf("Validate() = %v, want %T", got, tt.want)
+			}
+		})
+	}
+}

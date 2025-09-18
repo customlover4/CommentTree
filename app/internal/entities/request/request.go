@@ -21,3 +21,18 @@ type GetComments struct {
 	Substr   string `form:"substr"`
 	Page     int    `form:"page"`
 }
+
+func (gc *GetComments) Validate() string {
+	if gc.ParentID < 0 {
+		return "wrong id, id should be >= 0"
+	}
+	if gc.Page < 0 {
+		return "wrong page, page should be >= 0"
+	}
+
+	if gc.Page == 0 {
+		gc.Page++
+	}
+
+	return ""
+}
