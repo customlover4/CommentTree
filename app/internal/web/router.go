@@ -13,4 +13,5 @@ func Routes(router *ginext.Engine, s *service.Service) {
 
 	router.GET("/", handlers.MainPage())
 	router.POST("/comments", handlers.CreateComment(s))
+	router.DELETE("/comments/:id", handlers.DeleteComment(s))
 }

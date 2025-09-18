@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/wb-go/wbf/ginext"
 	"github.com/wb-go/wbf/zlog"
@@ -71,5 +72,46 @@ func CreateComment(s servicer) ginext.HandlerFunc {
 		}
 
 		ctx.JSON(http.StatusOK, response.OK(id))
+	}
+}
+
+func DeleteComment(s servicer) ginext.HandlerFunc {
+	return func(ctx *ginext.Context) {
+		const op = "internal.web.handlers.DeleteComment"
+
+		idParam := ctx.Param("id")
+		id, err := strconv.ParseInt(idParam, 10, 64)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, response.Error(
+				"id should be numeric",
+			))
+			return
+		}
+		if id <= 0 {
+			ctx.JSON(http.StatusBadRequest, response.Error(
+				"id shoud be > 0",
+			))
+			return
+		}
+
+		err = s.DeleteComment(id)
+		if errors.Is(err, service.ErrWrongData) {
+			ctx.JSON(http.StatusServiceUnavailable, response.Error(
+				err.Error(),
+			))
+		} else if errors.Is(err, service.ErrNotAffected) {
+			ctx.JSON(http.StatusServiceUnavailable, response.Error(
+				"can't find comment with this id",
+			))
+			return
+		} else if err != nil {
+			zlog.Logger.Error().Err(fmt.Errorf("%s: %w", op, err)).Send()
+			ctx.JSON(http.StatusInternalServerError, response.Error(
+				InternalError,
+			))
+			return
+		}
+
+		ctx.JSON(http.StatusOK, response.OK("ok"))
 	}
 }

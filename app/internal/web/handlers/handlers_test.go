@@ -139,3 +139,97 @@ func TestCreateComment(t *testing.T) {
 		})
 	}
 }
+
+func TestDeleteComment(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for target function.
+		s     servicer
+		param string
+		want  int
+	}{
+		{
+			name: "good",
+			s: &ServiceMock{
+				deleteF: func(id int64) error {
+					return nil
+				},
+			},
+			param: "12",
+			want:  http.StatusOK,
+		},
+		{
+			name: "bad json",
+			s: &ServiceMock{
+				deleteF: func(id int64) error {
+					return nil
+				},
+			},
+			param: "2sdg",
+			want:  http.StatusBadRequest,
+		},
+		{
+			name: "not valid data in json",
+			s: &ServiceMock{
+				deleteF: func(id int64) error {
+					return nil
+				},
+			},
+			param: "-1",
+			want:  http.StatusBadRequest,
+		},
+		{
+			name: "not valid id",
+			s: &ServiceMock{
+				deleteF: func(id int64) error {
+					return service.ErrWrongData
+				},
+			},
+			param: "1",
+			want:  http.StatusServiceUnavailable,
+		},
+		{
+			name: "not affected",
+			s: &ServiceMock{
+				deleteF: func(id int64) error {
+					return service.ErrNotAffected
+				},
+			},
+			param: "1",
+			want:  http.StatusServiceUnavailable,
+		},
+		{
+			name: "unknown err",
+			s: &ServiceMock{
+				deleteF: func(id int64) error {
+					return errors.New("unknown")
+				},
+			},
+			param: "1",
+			want:  http.StatusInternalServerError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			url := "/endpoint/"
+
+			gin.SetMode(gin.TestMode)
+			router := gin.New()
+			router.DELETE(url+":id", DeleteComment(tt.s))
+
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(
+				http.MethodDelete, url+tt.param, nil,
+			)
+
+			router.ServeHTTP(rr, req)
+
+			if rr.Result().StatusCode != tt.want {
+				t.Errorf(
+					"handler CreateComment() = %v, want %v",
+					rr.Result().StatusCode, tt.want,
+				)
+			}
+		})
+	}
+}
