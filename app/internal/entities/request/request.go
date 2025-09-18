@@ -15,3 +15,9 @@ func (cc *CreateComment) Validate() string {
 
 	return ""
 }
+
+type GetComments struct {
+	ParentID int64  `form:"parent"`
+	Substr   string `form:"substr"`
+	Page     int    `form:"page"`
+}
