@@ -40,7 +40,7 @@ func CreateComment(s servicer) ginext.HandlerFunc {
 		var req request.CreateComment
 		if err := ctx.BindJSON(&req); err != nil {
 			ctx.JSON(http.StatusBadRequest, response.Error(
-				"wrong data or types in json",
+				"wrong json, data or types in json",
 			))
 			return
 		}
