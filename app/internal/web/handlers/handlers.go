@@ -101,6 +101,7 @@ func DeleteComment(s servicer) ginext.HandlerFunc {
 			ctx.JSON(http.StatusServiceUnavailable, response.Error(
 				err.Error(),
 			))
+			return
 		} else if errors.Is(err, service.ErrNotAffected) {
 			ctx.JSON(http.StatusServiceUnavailable, response.Error(
 				"can't find comment with this id",

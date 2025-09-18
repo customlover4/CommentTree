@@ -25,6 +25,10 @@ var (
 	ConnString = "postgresql://dev:qqq@localhost:5432/test?sslmode=disable"
 	ConfigPath = "../config/config.yml"
 	Port       = "8080"
+
+	// TODO: move it to config.
+	ReadTimeout  = 5 * time.Second
+	WriteTimeout = 5 * time.Second
 )
 
 func init() {
@@ -47,7 +51,7 @@ func init() {
 }
 
 func shutdown(server *http.Server, srv *service.Service, str *storage.Storage) {
-	server.Shutdown(context.Background())
+	_ = server.Shutdown(context.Background())
 	srv.Shutdown()
 	str.Shutdown()
 }
@@ -59,8 +63,7 @@ func main() {
 	cfg := config.New()
 	err := cfg.Load(ConfigPath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		panic(err)
 	}
 
 	if cfg.GetString("debug") == "false" {
@@ -75,14 +78,18 @@ func main() {
 	web.Routes(router, srv)
 	server := &http.Server{
 		Handler:      router,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
+		ReadTimeout:  ReadTimeout,
+		WriteTimeout: WriteTimeout,
 	}
 
-	listener, err := net.Listen("tcp", ":"+Port)
+	l := net.ListenConfig{}
+
+	ctx, finish := context.WithCancel(context.Background())
+	defer finish()
+
+	listener, err := l.Listen(ctx, "tcp", ":"+Port)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		panic(err)
 	}
 
 	go func() {
@@ -97,7 +104,9 @@ func main() {
 	zlog.Logger.Info().Msg("server started on :" + Port)
 
 	<-sig
-	zlog.Logger.Info().Msg("gracefull shutdown started")
+
+	finish()
 	shutdown(server, srv, str)
+
 	zlog.Logger.Info().Msg("server stopped")
 }

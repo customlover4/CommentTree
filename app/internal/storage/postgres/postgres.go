@@ -23,13 +23,23 @@ const (
 
 	// Postgres errors.
 	ViolatesForeignKey = "23503"
+
+	// Params.
+	ConnMaxLifeTime = 2
+	MaxIdleConns    = 20
+	MaxOpenConns    = 100
+
+	// RetryStrategy.
+	Attempts = 3
+	Delay    = 3
+	Backoff  = 2
 )
 
 var (
 	retryOpts = retry.Strategy{
-		Attempts: 3,
-		Delay:    3,
-		Backoff:  2,
+		Attempts: Attempts,
+		Delay:    Delay,
+		Backoff:  Backoff,
 	}
 )
 
@@ -39,9 +49,9 @@ type Postgres struct {
 
 func New(conn string) *Postgres {
 	pg, err := dbpg.New(conn, nil, &dbpg.Options{
-		MaxOpenConns:    100,
-		MaxIdleConns:    20,
-		ConnMaxLifetime: 2 * time.Hour,
+		MaxOpenConns:    MaxOpenConns,
+		MaxIdleConns:    MaxIdleConns,
+		ConnMaxLifetime: ConnMaxLifeTime * time.Hour,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

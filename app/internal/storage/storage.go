@@ -12,10 +12,10 @@ var (
 )
 
 type db interface {
-	Create(c comment.Comment) (int64, error)
+	CreateComment(c comment.Comment) (int64, error)
 	Parent(id int64) (comment.Comment, error)
 	Childs(parentID int64, opts *comment.GetterOpts) ([]comment.Comment, error)
-	Delete(id int64) error
+	DeleteComment(id int64) error
 
 	UnwrapError(err error) error
 	Shutdown()

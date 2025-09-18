@@ -8,7 +8,6 @@ import (
 )
 
 func Routes(router *ginext.Engine, s *service.Service) {
-
 	router.LoadHTMLGlob("templates/*.html")
 
 	router.GET("/", handlers.MainPage())

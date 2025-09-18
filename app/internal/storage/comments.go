@@ -10,7 +10,7 @@ import (
 func (s *Storage) CreateComment(c comment.Comment) (int64, error) {
 	const op = "internal.storage.Create"
 
-	id, err := s.db.Create(c)
+	id, err := s.db.CreateComment(c)
 	err = s.UnwrapError(err)
 	if errors.Is(err, errs.ErrDBViolatesForeignKey) {
 		return 0, ErrWrongForeignKey
@@ -51,7 +51,7 @@ func (s *Storage) Comments(parentID int64, opts *comment.GetterOpts) (*comment.C
 func (s *Storage) DeleteComment(id int64) error {
 	const op = "internal.storage.Delete"
 
-	err := s.db.Delete(id)
+	err := s.db.DeleteComment(id)
 	if errors.Is(err, errs.ErrDBNotAffected) {
 		return ErrNotAffected
 	} else if err != nil {

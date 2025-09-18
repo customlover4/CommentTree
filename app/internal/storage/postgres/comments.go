@@ -9,7 +9,7 @@ import (
 	"fmt"
 )
 
-func (p *Postgres) Create(c comment.Comment) (int64, error) {
+func (p *Postgres) CreateComment(c comment.Comment) (int64, error) {
 	const op = "internal.storage.postgres.comments.Create"
 
 	q := fmt.Sprintf(
@@ -39,7 +39,7 @@ func (p *Postgres) generateAgrigatedOpts(parentID int64, opts *comment.GetterOpt
 		opts = nil
 	}
 
-	args := make([]any, 0, 10)
+	args := []any{}
 	argsStr := fmt.Sprintf(`
 		select * from %s
 	`, CommentsTable)
@@ -121,13 +121,14 @@ func (p *Postgres) Childs(parentID int64, opts *comment.GetterOpts) ([]comment.C
 	defer func() {
 		_ = rows.Close()
 	}()
+
 	if errors.Is(rows.Err(), sql.ErrNoRows) {
 		return nil, errs.ErrDBNotFound
 	} else if rows.Err() != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	coms := make([]comment.Comment, 0, 10)
+	coms := []comment.Comment{}
 	for rows.Next() {
 		var tmp comment.Comment
 		var parentID sql.NullInt64
@@ -147,7 +148,7 @@ func (p *Postgres) Childs(parentID int64, opts *comment.GetterOpts) ([]comment.C
 	return coms, nil
 }
 
-func (p *Postgres) Delete(id int64) error {
+func (p *Postgres) DeleteComment(id int64) error {
 	const op = "internal.storage.postgres.comments.Delete"
 
 	q := fmt.Sprintf("delete from %s where id = $1", CommentsTable)

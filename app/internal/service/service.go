@@ -1,8 +1,9 @@
 package service
 
 import (
-	"CommentTree/internal/entities/comment"
 	"errors"
+
+	"CommentTree/internal/entities/comment"
 )
 
 var (
