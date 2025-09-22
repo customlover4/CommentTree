@@ -2,7 +2,7 @@
 
 ### command for start up
 ```
-https://github.com/customlover4/CommentTree.git && cd CommentTree && cd docker && docker-compose build && docker-compose up
+git clone https://github.com/customlover4/CommentTree.git CommentTree && cd CommentTree && cd docker && docker-compose build && docker-compose up
 ```
 
 ### steps for start up
