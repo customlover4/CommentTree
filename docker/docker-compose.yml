@@ -22,26 +22,26 @@ services:
     networks:
       - app-network
 
-  # app:
-  #   build:
-  #     context: ../shortener
-  #     dockerfile: ../shortener/dockerfile.production
-  #   ports:
-  #     - "80:8080"
-  #   environment:
-  #     - DEBUG=false
-  #     - PORT=8080
-  #     - POSTGRES_PASSWORD=qqq
-  #     - CONFIG_PATH=../config/config.yml
-  #     - TEMPLATES=templates/*.html
-  #   volumes:
-  #     - ../config:/config
-  #   restart: unless-stopped
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   networks:
-  #     - app-network
+  app:
+    build:
+      context: ../app
+      dockerfile: ../app/dockerfile.production
+    ports:
+      - "80:8080"
+    environment:
+      - DEBUG=false
+      - PORT=8080
+      - POSTGRES_CONN=postgresql://dev:qqq@postgres:5432/test?sslmode=disable
+      - CONFIG_PATH=../config/config.yml
+      - TEMPLATES=templates/*.html
+    volumes:
+      - ../config:/config
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
 
 networks:
   app-network:
