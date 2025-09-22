@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Поиск комментариев</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        .comment {
+            border-left: 3px solid #007bff;
+            padding: 10px;
+            margin-bottom: 10px;
+            margin-left: 0;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .comment.deleted {
+            opacity: 0.4;
+            background-color: #f8d7da;
+            border-left-color: #dc3545;
+            text-decoration: line-through;
+        }
+        .comment-child {
+            margin-left: 30px;
+            border-left-color: #28a745;
+        }
+        .loading {
+            color: #6c757d;
+            text-align: center;
+            padding: 10px;
+        }
+        .error {
+            color: #dc3545;
+            padding: 10px;
+            background-color: #f8d7da;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        .load-replies-btn,
+        .load-more-btn,
+        .delete-btn {
+            margin-top: 5px;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        .load-more-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .load-more-btn:hover {
+            background: #5a6268;
+        }
+        .delete-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+        .delete-btn:hover {
+            background: #c82333;
+        }
+        .load-more-replies-btn {
+            margin-top: 8px;
+            margin-left: 0;
+            display: inline-block;
+        }
+        .search-form {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: end;
+        }
+        .search-form input,
+        .search-form button {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .search-form input[type="text"],
+        .search-form input[type="number"] {
+            min-width: 200px;
+        }
+        .search-form button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .search-form button:hover {
+            background: #0056b3;
+        }
+        .search-form label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .search-params {
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .parent-comment-header {
+            background: #f1f3f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #dc3545;
+            position: relative;
+        }
+        .parent-comment-header strong {
+            font-size: 1.2em;
+        }
+        .parent-comment-header .delete-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container mt-4">
+            <h1 class="mb-4">🔍 Поиск комментариев</h1>
+            <h3><a href="/">Главная</a></h3>
+
+            <!-- Форма поиска -->
+            <div class="search-form">
+                <input 
+                    v-model="searchText" 
+                    placeholder="Введите текст для поиска..." 
+                    @keyup.enter="performSearch"
+                />
+                <input 
+                    v-model="searchParent" 
+                    placeholder="ID родителя (необязательно)" 
+                    type="number"
+                    @keyup.enter="performSearch"
+                />
+                <label>
+                    <input type="checkbox" v-model="searchGlobal" />
+                    Искать глобально
+                </label>
+                <button @click="performSearch">🔎 Найти</button>
+            </div>
+
+            <!-- Отображение текущих параметров поиска -->
+            <div v-if="currentSubstr || currentParent !== null || currentSearchGlobal" class="search-params">
+                <strong>Поиск:</strong>
+                <span v-if="currentSubstr">текст: "{{ currentSubstr }}"</span>
+                <span v-if="currentParent !== null">, родитель: #{{ currentParent }}</span>
+                <span v-if="currentSearchGlobal">, 🔍 глобальный поиск</span>
+            </div>
+
+            <!-- 🔥 Родительский комментарий в шапке -->
+            <div v-if="parentComment" class="parent-comment-header" :class="{ deleted: parentComment.isDeleted }">
+                <strong>Родительский комментарий #{{ parentComment.id }}</strong>
+                <p class="mt-2">{{ parentComment.message }}</p>
+                <a :href="`/show?parent=${parentComment.parent_id}`" v-if="parentComment.parent_id > 0 && !parentComment.isDeleted" class="small">
+                    ← Ответ на #{{ parentComment.parent_id }}
+                </a>
+                <a v-else="" href="/show">
+                    Все коментарии
+                </a>
+                <button class="delete-btn" @click="deleteComment(parentComment.id, true)" v-if="!parentComment.isDeleted">
+                    🗑️ Удалить
+                </button>
+            </div>
+
+            <div v-if="loading" class="loading">⌛ Загрузка комментариев...</div>
+            <div v-else-if="error" class="error">❌ {{ error }}</div>
+            <div v-else>
+                <div v-if="comments.length === 0 && !hasMoreRoot" class="loading">😔 Ничего не найдено</div>
+
+                <!-- Результаты поиска или ответы на parent -->
+                <comment-item 
+                    v-for="comment in comments" 
+                    :key="comment.id" 
+                    :comment="comment"
+                    :level="0"
+                    @load-replies="loadReplies"
+                    @load-more-replies="loadMoreReplies"
+                    @delete-comment="deleteComment">
+                </comment-item>
+
+                <!-- Пагинация -->
+                <div v-if="hasMoreRoot" class="text-center mt-3">
+                    <button 
+                        v-if="!loadingMoreRoot" 
+                        @click="loadMoreRoot" 
+                        class="load-more-btn">
+                        📥 Загрузить ещё
+                    </button>
+                    <div v-else class="loading small">⌛ Загрузка...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const { createApp, ref, onMounted } = Vue;
+
+    const CommentItem = {
+        props: ['comment', 'level'],
+        emits: ['load-replies', 'load-more-replies', 'delete-comment'],
+        setup(props, { emit }) {
+            return () => {
+                if (props.comment.isDeleted) {
+                    return null;
+                }
+
+                const children = [];
+
+                children.push(
+                    Vue.h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
+                        Vue.h('div', [
+                            Vue.h('strong', `#${props.comment.id}`),
+                            props.comment.parent_id > 0 
+                                ? Vue.h('span', ` (ответ на #${props.comment.parent_id})`) 
+                                : null
+                        ]),
+                        Vue.h('button', {
+                            class: 'delete-btn',
+                            onClick: () => emit('delete-comment', props.comment.id)
+                        }, '🗑️ Удалить')
+                    ])
+                );
+
+                children.push(
+                    Vue.h('p', { class: 'mb-1 mt-1' }, props.comment.message)
+                );
+
+                if (!props.comment.repliesLoaded && !props.comment.loading && !props.comment.replies?.length) {
+                    children.push(
+                        Vue.h('button', {
+                            class: 'btn btn-sm btn-outline-primary load-replies-btn',
+                            onClick: () => emit('load-replies', props.comment.id)
+                        }, '📥 Загрузить ответы')
+                    );
+                }
+
+                if (props.comment.loading) {
+                    children.push(
+                        Vue.h('div', { class: 'loading small' }, '⌛ Загрузка...')
+                    );
+                }
+
+                if (props.comment.loadingMore) {
+                    children.push(
+                        Vue.h('div', { class: 'loading small' }, '⌛ Загрузка ещё...')
+                    );
+                }
+
+                if (props.comment.replies && props.comment.replies.length > 0) {
+                    props.comment.replies.forEach(reply => {
+                        if (!reply.isDeleted) {
+                            children.push(
+                                Vue.h(CommentItem, {
+                                    key: reply.id,
+                                    comment: reply,
+                                    level: props.level + 1,
+                                    onLoadReplies: (id) => emit('load-replies', id),
+                                    onLoadMoreReplies: (id) => emit('load-more-replies', id),
+                                    onDeleteComment: (id) => emit('delete-comment', id)
+                                })
+                            );
+                        }
+                    });
+
+                    const lastReply = props.comment.replies[props.comment.replies.length - 1];
+                    if (
+                        lastReply &&
+                        lastReply.have_next &&
+                        lastReply.parent_id === props.comment.id &&
+                        !props.comment.loadingMore &&
+                        !lastReply.isDeleted
+                    ) {
+                        children.push(
+                            Vue.h('div', { style: { marginTop: '8px', marginLeft: '0' } },
+                                Vue.h('button', {
+                                    class: 'load-more-btn load-more-replies-btn',
+                                    style: { fontSize: '12px' },
+                                    onClick: () => emit('load-more-replies', props.comment.id)
+                                }, '📥 Загрузить ещё ответы')
+                            )
+                        );
+                    }
+                }
+
+                if (props.comment.repliesLoaded && (!props.comment.replies || props.comment.replies.every(r => r.isDeleted))) {
+                    children.push(
+                        Vue.h('div', { class: 'small text-muted' }, '😔 Ответов нет')
+                    );
+                }
+
+                return Vue.h('div', {
+                    class: ['comment', props.level > 0 ? 'comment-child' : ''],
+                    style: { marginLeft: `${props.level * 30}px` }
+                }, children);
+            };
+        }
+    };
+
+    createApp({
+        components: {
+            'comment-item': CommentItem
+        },
+        setup() {
+            const comments = ref([]);
+            const parentComment = ref(null);
+            const parentId = ref(null);
+            const loading = ref(true);
+            const error = ref('');
+            const currentPageRoot = ref(1);
+            const loadingMoreRoot = ref(false);
+            const hasMoreRoot = ref(true);
+            const searchText = ref('');
+            const searchParent = ref('');
+            const searchGlobal = ref(false);
+            const currentSubstr = ref('');
+            const currentParent = ref(null);
+            const currentSearchGlobal = ref(false);
+
+            onMounted(() => {
+                initializeFromURL();
+            });
+
+            // 🔥 Новая функция: загрузить один комментарий по ID
+            async function loadSingleComment(id) {
+                try {
+                    const response = await fetch(`/comments/${id}`);
+                    if (!response.ok) throw new Error(`Ошибка загрузки комментария: ${response.status}`);
+                    const data = await response.json();
+                    if (data.status === 'error') throw new Error(data.error);
+
+                    return {
+                        id: data.ID,
+                        message: data.Message,
+                        parent_id: data.ParentID || 0,
+                        isDeleted: false
+                    };
+                } catch (err) {
+                    console.error('Ошибка загрузки родительского комментария:', err);
+                    throw err;
+                }
+            }
+
+            function initializeFromURL() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const substrParam = urlParams.get('substr');
+                const parentParam = urlParams.get('parent');
+                const globalParam = urlParams.get('search_global');
+
+                if (substrParam !== null) {
+                    searchText.value = substrParam;
+                    currentSubstr.value = substrParam;
+                }
+
+                if (parentParam !== null && !isNaN(parentParam)) {
+                    searchParent.value = parentParam;
+                    currentParent.value = parseInt(parentParam, 10);
+                    parentId.value = currentParent.value;
+                } else {
+                    currentParent.value = null;
+                    parentId.value = null;
+                }
+
+                if (globalParam !== null) {
+                    currentSearchGlobal.value = ['true', '1', 't', 'TRUE', 'True'].includes(globalParam);
+                    searchGlobal.value = currentSearchGlobal.value;
+                } else {
+                    currentSearchGlobal.value = false;
+                    searchGlobal.value = false;
+                }
+
+                if (parentId.value !== null) {
+                    loadParentWithSearch();
+                } else if (currentSubstr.value || currentSearchGlobal.value) {
+                    loadSearchResults(1);
+                } else {
+                    loadRootComments(1);
+                }
+            }
+
+            // 🔥 Исправленная: теперь загружает parent отдельно, если его нет в ответе
+            async function loadParentWithSearch() {
+                try {
+                    loading.value = true;
+                    error.value = '';
+
+                    // 1. Загружаем ответы
+                    let url = `/comments?parent=${parentId.value}&page=1`;
+                    if (currentSubstr.value) {
+                        url += `&substr=${encodeURIComponent(currentSubstr.value)}`;
+                    }
+                    if (currentSearchGlobal.value) {
+                        url += `&search_global=true`;
+                    }
+
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
+
+                    const data = await response.json();
+                    if (data.status === 'error') throw new Error(data.error);
+
+                    const newComments = transformCommentData(data.result);
+                    comments.value = newComments;
+                    console.log(data)
+                    // 2. 🔥 Загружаем родителя отдельно, если его нет
+                    if (data.result.parent) {
+                        parentComment.value = {
+                            id: data.result.parent.ID,
+                            message: data.result.parent.Message,
+                            parent_id: data.result.parent.ParentID || 0,
+                            isDeleted: false
+                        };
+                    } else {
+                        try {
+                            const parentData = await loadSingleComment(parentId.value);
+                            parentComment.value = parentData;
+                        } catch (err) {
+                            error.value = 'Не удалось загрузить родительский комментарий';
+                            parentComment.value = null;
+                        }
+                    }
+
+                    // 3. Пагинация
+                    let serverHaveNext = data.have_next;
+                    if (serverHaveNext === undefined && newComments.length > 0) {
+                        const lastComment = newComments[newComments.length - 1];
+                        serverHaveNext = lastComment.have_next;
+                    }
+                    hasMoreRoot.value = !!serverHaveNext;
+
+                } catch (err) {
+                    error.value = 'Ошибка загрузки: ' + err.message;
+                    console.error(err);
+                } finally {
+                    loading.value = false;
+                }
+            }
+
+            function performSearch() {
+                currentSubstr.value = searchText.value.trim();
+                currentParent.value = searchParent.value ? parseInt(searchParent.value, 10) : null;
+                currentSearchGlobal.value = searchGlobal.value;
+                currentPageRoot.value = 1;
+
+                const params = new URLSearchParams();
+                if (currentSubstr.value) params.set('substr', currentSubstr.value);
+                if (currentParent.value !== null) params.set('parent', currentParent.value);
+                if (currentSearchGlobal.value) params.set('search_global', 'true');
+
+                const newUrl = `${location.pathname}?${params.toString()}`;
+                window.history.replaceState(null, '', newUrl);
+
+                if (currentParent.value !== null) {
+                    parentId.value = currentParent.value;
+                    loadParentWithSearch();
+                } else {
+                    loadSearchResults(1);
+                }
+            }
+
+            async function loadSearchResults(page) {
+                try {
+                    if (page === 1) {
+                        loading.value = true;
+                        error.value = '';
+                    } else {
+                        loadingMoreRoot.value = true;
+                    }
+
+                    let url = `/comments/?substr=${encodeURIComponent(currentSubstr.value || '')}&page=${page}`;
+                    if (currentSearchGlobal.value) {
+                        url += `&search_global=true`;
+                    }
+
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
+
+                    const data = await response.json();
+                    if (data.status === 'error') throw new Error(data.error);
+
+                    const newComments = transformCommentData(data.result);
+
+                    if (page === 1) {
+                        comments.value = newComments;
+                    } else {
+                        comments.value.push(...newComments);
+                    }
+
+                    let serverHaveNext = data.have_next;
+                    if (serverHaveNext === undefined && newComments.length > 0) {
+                        const lastComment = newComments[newComments.length - 1];
+                        serverHaveNext = lastComment.have_next;
+                    }
+                    hasMoreRoot.value = !!serverHaveNext;
+
+                } catch (err) {
+                    error.value = 'Ошибка поиска: ' + err.message;
+                    console.error(err);
+                } finally {
+                    if (page === 1) {
+                        loading.value = false;
+                    } else {
+                        loadingMoreRoot.value = false;
+                    }
+                }
+            }
+
+            function loadMoreRoot() {
+                currentPageRoot.value++;
+                if (parentId.value !== null) {
+                    loadMoreParentReplies();
+                } else {
+                    loadSearchResults(currentPageRoot.value);
+                }
+            }
+
+            async function loadMoreParentReplies() {
+                if (parentId.value === null) return;
+
+                loadingMoreRoot.value = true;
+
+                try {
+                    let url = `/comments?parent=${parentId.value}&page=${currentPageRoot.value}`;
+                    if (currentSubstr.value) {
+                        url += `&substr=${encodeURIComponent(currentSubstr.value)}`;
+                    }
+                    if (currentSearchGlobal.value) {
+                        url += `&search_global=true`;
+                    }
+
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
+
+                    const data = await response.json();
+                    if (data.status === 'error') throw new Error(data.error);
+
+                    const newReplies = transformCommentData(data.result);
+
+                    if (newReplies.length > 0) {
+                        comments.value.push(...newReplies);
+                    }
+
+                    let serverHaveNext = data.have_next;
+                    if (serverHaveNext === undefined && newReplies.length > 0) {
+                        const lastReply = newReplies[newReplies.length - 1];
+                        serverHaveNext = lastReply.have_next;
+                    }
+                    hasMoreRoot.value = !!serverHaveNext;
+
+                } catch (err) {
+                    error.value = 'Ошибка загрузки: ' + err.message;
+                    console.error(err);
+                } finally {
+                    loadingMoreRoot.value = false;
+                }
+            }
+
+            async function deleteComment(commentId, isParent = false) {
+                if (!confirm('Вы уверены, что хотите удалить этот комментарий и все его ответы?')) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/comments/${commentId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+
+                    if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
+
+                    const data = await response.json();
+                    if (data.status === 'error') throw new Error(data.error);
+
+                    if (isParent && parentComment.value && parentComment.value.id === commentId) {
+                        parentComment.value.isDeleted = true;
+                    } else {
+                        markAsDeleted(comments.value, commentId);
+                    }
+
+                    alert('✅ Комментарий удалён');
+
+                } catch (err) {
+                    error.value = 'Ошибка удаления: ' + err.message;
+                    console.error(err);
+                }
+            }
+
+            function markAsDeleted(commentsList, targetId) {
+                for (const comment of commentsList) {
+                    if (comment.id === targetId) {
+                        comment.isDeleted = true;
+                        if (comment.replies && comment.replies.length > 0) {
+                            markAllChildrenAsDeleted(comment.replies);
+                        }
+                        return true;
+                    }
+                    if (comment.replies && comment.replies.length > 0) {
+                        if (markAsDeleted(comment.replies, targetId)) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            function markAllChildrenAsDeleted(replies) {
+                replies.forEach(reply => {
+                    reply.isDeleted = true;
+                    if (reply.replies && reply.replies.length > 0) {
+                        markAllChildrenAsDeleted(reply.replies);
+                    }
+                });
+            }
+
+            async function loadReplies(commentId) {
+                const comment = findComment(comments.value, commentId);
+                if (!comment) return;
+
+                comment.loading = true;
+
+                try {
+                    const response = await fetch(`/comments?parent=${commentId}&page=1`);
+                    if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
+
+                    const data = await response.json();
+                    if (data.status === 'error') throw new Error(data.error);
+
+                    const newReplies = transformCommentData(data.result);
+
+                    comment.replies = newReplies;
+                    comment.repliesLoaded = true;
+                    comment.currentPage = 1;
+
+                } catch (err) {
+                    error.value = 'Ошибка загрузки ответов: ' + err.message;
+                    console.error('Ошибка загрузки ответов:', err);
+                } finally {
+                    comment.loading = false;
+                }
+            }
+
+            async function loadMoreReplies(commentId) {
+                const comment = findComment(comments.value, commentId);
+                if (!comment) return;
+
+                comment.loadingMore = true;
+
+                try {
+                    const nextPage = (comment.currentPage || 1) + 1;
+                    const response = await fetch(`/comments?parent=${commentId}&page=${nextPage}`);
+                    if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
+
+                    const data = await response.json();
+                    if (data.status === 'error') throw new Error(data.error);
+
+                    const newReplies = transformCommentData(data.result);
+
+                    if (newReplies.length > 0) {
+                        comment.replies.push(...newReplies);
+                        comment.currentPage = nextPage;
+                    }
+
+                } catch (err) {
+                    error.value = 'Ошибка загрузки дополнительных ответов: ' + err.message;
+                    console.error('Ошибка:', err);
+                } finally {
+                    comment.loadingMore = false;
+                }
+            }
+
+            function transformCommentData(data) {
+                if (Array.isArray(data)) {
+                    return data.map(item => ({
+                        id: item.ID,
+                        message: item.Message,
+                        parent_id: item.ParentID,
+                        replies: [],
+                        repliesLoaded: false,
+                        have_next: item.have_next || false,
+                        loading: false,
+                        loadingMore: false,
+                        currentPage: 0,
+                        isDeleted: false
+                    }));
+                }
+                if (data && data.childs && Array.isArray(data.childs)) {
+                    return data.childs.map(child => ({
+                        id: child.ID,
+                        message: child.Message,
+                        parent_id: child.ParentID,
+                        replies: [],
+                        repliesLoaded: false,
+                        have_next: child.have_next || false,
+                        loading: false,
+                        loadingMore: false,
+                        currentPage: 0,
+                        isDeleted: false
+                    }));
+                }
+                if (data && typeof data === 'object' && data.ID !== undefined) {
+                    return [{
+                        id: data.ID,
+                        message: data.Message,
+                        parent_id: data.ParentID,
+                        replies: [],
+                        repliesLoaded: false,
+                        have_next: data.have_next || false,
+                        loading: false,
+                        loadingMore: false,
+                        currentPage: 0,
+                        isDeleted: false
+                    }];
+                }
+                return [];
+            }
+
+            function findComment(commentsList, commentId) {
+                for (const comment of commentsList) {
+                    if (comment.id === commentId) {
+                        return comment;
+                    }
+                    if (comment.replies && comment.replies.length > 0) {
+                        const found = findComment(comment.replies, commentId);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            }
+
+            async function loadRootComments(page) {
+                try {
+                    if (page === 1) {
+                        loading.value = true;
+                        error.value = '';
+                    } else {
+                        loadingMoreRoot.value = true;
+                    }
+
+                    const url = `/comments?page=${page}`;
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
+
+                    const data = await response.json();
+                    if (data.status === 'error') throw new Error(data.error);
+
+                    const newComments = transformCommentData(data.result);
+
+                    if (page === 1) {
+                        comments.value = newComments;
+                    } else {
+                        comments.value.push(...newComments);
+                    }
+
+                    let serverHaveNext = data.have_next;
+                    if (serverHaveNext === undefined && newComments.length > 0) {
+                        const lastRootComment = newComments[newComments.length - 1];
+                        serverHaveNext = lastRootComment.have_next;
+                    }
+                    hasMoreRoot.value = !!serverHaveNext;
+
+                } catch (err) {
+                    error.value = err.message;
+                    console.error('Ошибка загрузки:', err);
+                } finally {
+                    if (page === 1) {
+                        loading.value = false;
+                    } else {
+                        loadingMoreRoot.value = false;
+                    }
+                }
+            }
+
+            return {
+                comments,
+                parentComment,
+                loading,
+                error,
+                hasMoreRoot,
+                loadingMoreRoot,
+                searchText,
+                searchParent,
+                searchGlobal,
+                currentSubstr,
+                currentParent,
+                currentSearchGlobal,
+                performSearch,
+                loadReplies,
+                loadMoreReplies,
+                loadMoreRoot,
+                deleteComment
+            };
+        }
+    }).mount('#app');
+    </script>
+</body>
+</html>
