@@ -1,10 +1,6 @@
 package main
 
 import (
-	"CommentTree/internal/service"
-	"CommentTree/internal/storage"
-	"CommentTree/internal/storage/postgres"
-	"CommentTree/internal/web"
 	"context"
 	"errors"
 	"fmt"
@@ -14,6 +10,11 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"CommentTree/internal/service"
+	"CommentTree/internal/storage"
+	"CommentTree/internal/storage/postgres"
+	"CommentTree/internal/web"
 
 	"github.com/gin-gonic/gin"
 	"github.com/wb-go/wbf/config"
@@ -25,10 +26,7 @@ var (
 	ConnString = "postgresql://dev:qqq@localhost:5432/test?sslmode=disable"
 	ConfigPath = "../config/config.yml"
 	Port       = "8080"
-
-	// TODO: move it to config.
-	ReadTimeout  = 5 * time.Second
-	WriteTimeout = 5 * time.Second
+	Debug      = "true"
 )
 
 func init() {
@@ -48,6 +46,11 @@ func init() {
 	if tmp != "" {
 		Port = tmp
 	}
+
+	tmp = os.Getenv("DEBUG")
+	if tmp != "" {
+		Debug = tmp
+	}
 }
 
 func shutdown(server *http.Server, srv *service.Service, str *storage.Storage) {
@@ -66,13 +69,24 @@ func main() {
 		panic(err)
 	}
 
-	if cfg.GetString("debug") == "false" {
+	if Debug == "false" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
 	p := postgres.New(ConnString)
 	str := storage.New(p)
 	srv := service.New(str)
+
+	rTimeoutCfg := cfg.GetString("read_timeout")
+	wTimeoutCfg := cfg.GetString("write_timeout")
+	ReadTimeout, err := time.ParseDuration(rTimeoutCfg)
+	if err != nil {
+		panic(err)
+	}
+	WriteTimeout, err := time.ParseDuration(wTimeoutCfg)
+	if err != nil {
+		panic(err)
+	}
 
 	router := ginext.New()
 	web.Routes(router, srv)
