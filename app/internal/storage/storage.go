@@ -1,8 +1,9 @@
 package storage
 
 import (
-	"CommentTree/internal/entities/comment"
 	"errors"
+
+	"CommentTree/internal/entities/comment"
 )
 
 var (
@@ -17,7 +18,6 @@ type db interface {
 	Childs(parentID int64, opts *comment.GetterOpts) ([]comment.Comment, error)
 	DeleteComment(id int64) error
 
-	UnwrapError(err error) error
 	Shutdown()
 }
 

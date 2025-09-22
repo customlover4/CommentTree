@@ -1,17 +1,17 @@
 package storage
 
 import (
-	"CommentTree/internal/entities/comment"
-	"CommentTree/pkg/errs"
 	"errors"
 	"fmt"
+
+	"CommentTree/internal/entities/comment"
+	"CommentTree/pkg/errs"
 )
 
 func (s *Storage) CreateComment(c comment.Comment) (int64, error) {
 	const op = "internal.storage.Create"
 
 	id, err := s.db.CreateComment(c)
-	err = s.UnwrapError(err)
 	if errors.Is(err, errs.ErrDBViolatesForeignKey) {
 		return 0, ErrWrongForeignKey
 	} else if err != nil {

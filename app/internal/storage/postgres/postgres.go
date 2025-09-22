@@ -1,12 +1,13 @@
 package postgres
 
 import (
-	"CommentTree/pkg/errs"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"time"
+
+	"CommentTree/pkg/errs"
 
 	"github.com/lib/pq"
 	"github.com/wb-go/wbf/dbpg"
@@ -16,10 +17,6 @@ import (
 const (
 	// Tables names.
 	CommentsTable = "comments"
-
-	// TODO: think about move it to comment entity.
-	// Elements per page for pagination.
-	PageElements = 1
 
 	// Postgres errors.
 	ViolatesForeignKey = "23503"
@@ -69,7 +66,14 @@ func New(conn string) *Postgres {
 	}
 }
 
-func (p *Postgres) UnwrapError(err error) error {
+func (p *Postgres) Shutdown() {
+	_ = p.db.Master.Close()
+	for i := 0; i < len(p.db.Slaves); i++ {
+		_ = p.db.Slaves[i].Close()
+	}
+}
+
+func (p *Postgres) unwrapInternalError(op string, err error) error {
 	var pgErr *pq.Error
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
@@ -78,12 +82,5 @@ func (p *Postgres) UnwrapError(err error) error {
 		}
 	}
 
-	return err
-}
-
-func (p *Postgres) Shutdown() {
-	_ = p.db.Master.Close()
-	for i := 0; i < len(p.db.Slaves); i++ {
-		_ = p.db.Slaves[i].Close()
-	}
+	return fmt.Errorf("%s: %w", op, err)
 }
