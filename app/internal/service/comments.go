@@ -1,10 +1,11 @@
 package service
 
 import (
-	"CommentTree/internal/entities/comment"
-	"CommentTree/internal/storage"
 	"errors"
 	"fmt"
+
+	"CommentTree/internal/entities/comment"
+	"CommentTree/internal/storage"
 )
 
 func (s *Service) CreateComment(c comment.Comment) (int64, error) {

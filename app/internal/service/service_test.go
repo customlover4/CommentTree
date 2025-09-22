@@ -1,10 +1,11 @@
 package service
 
 import (
-	"CommentTree/internal/entities/comment"
-	"CommentTree/internal/storage"
 	"errors"
 	"testing"
+
+	"CommentTree/internal/entities/comment"
+	"CommentTree/internal/storage"
 )
 
 type StorageMock struct {
