@@ -17,9 +17,10 @@ func (cc *CreateComment) Validate() string {
 }
 
 type GetComments struct {
-	ParentID int64  `form:"parent"`
-	Substr   string `form:"substr"`
-	Page     int    `form:"page"`
+	ParentID     int64  `form:"parent"`
+	Substr       string `form:"substr"`
+	Page         int    `form:"page"`
+	SearchGlobal bool   `form:"search_global"`
 }
 
 func (gc *GetComments) Validate() string {

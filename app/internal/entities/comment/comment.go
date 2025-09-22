@@ -1,9 +1,15 @@
 package comment
 
+const (
+	// Elements per page for pagination.
+	PageElements = 10
+)
+
 type Comment struct {
 	ID       int64
 	Message  string
 	ParentID int64
+	HaveNext bool `json:"have_next"`
 }
 
 type CommentView struct {
@@ -12,8 +18,11 @@ type CommentView struct {
 }
 
 type GetterOpts struct {
-	Page   int    `form:"page"`
-	Substr string `form:"substr"`
+	// For searching in all comments by substr.
+	SearchGlobal bool
+
+	Page   int
+	Substr string
 }
 
 func (g *GetterOpts) Empty() bool {
