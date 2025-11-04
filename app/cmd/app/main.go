@@ -20,7 +20,16 @@ import (
 	"github.com/wb-go/wbf/config"
 	"github.com/wb-go/wbf/ginext"
 	"github.com/wb-go/wbf/zlog"
+
+	_ "CommentTree/docs"
 )
+
+// @title           CommentTree
+// @version         1.0
+// @description     API for viewing comments in tree mode
+// @host            localhost:80
+// @BasePath        /
+// @schemes         http
 
 var (
 	ConnString = "postgresql://dev:qqq@localhost:5432/test?sslmode=disable"

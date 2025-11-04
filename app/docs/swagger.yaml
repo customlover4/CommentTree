@@ -1,0 +1,140 @@
+basePath: /
+definitions:
+  request.CreateComment:
+    properties:
+      message:
+        type: string
+      parent_id:
+        type: integer
+    type: object
+  response.Response:
+    properties:
+      error:
+        type: string
+      result: {}
+      status:
+        type: string
+    type: object
+host: localhost:80
+info:
+  contact: {}
+  description: API for viewing comments in tree mode
+  title: CommentTree
+  version: "1.0"
+paths:
+  /comments:
+    get:
+      description: Fetches comments with pagination, filtering, and search.
+      parameters:
+      - default: 0
+        description: Parent comment ID (0 for root)
+        in: query
+        name: parent
+        type: integer
+      - description: Substring to search in messages
+        in: query
+        name: substr
+        type: string
+      - default: 1
+        description: Page number (starts from 1)
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - default: false
+        description: Search in all comments, not just parent subtree
+        in: query
+        name: search_global
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get comments list
+      tags:
+      - Comments
+    post:
+      consumes:
+      - application/json
+      description: Creates a comment with message and optional parent ID.
+      parameters:
+      - description: Comment creation data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateComment'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Create a new comment
+      tags:
+      - Comments
+  /comments/{id}:
+    delete:
+      description: Deletes a comment by its numeric ID.
+      parameters:
+      - description: Comment ID
+        in: path
+        minimum: 1
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Delete a comment
+      tags:
+      - Comments
+schemes:
+- http
+swagger: "2.0"

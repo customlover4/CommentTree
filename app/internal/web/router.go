@@ -4,11 +4,15 @@ import (
 	"CommentTree/internal/service"
 	"CommentTree/internal/web/handlers"
 
+	f "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/wb-go/wbf/ginext"
 )
 
 func Routes(router *ginext.Engine, s *service.Service) {
 	router.Delims("__", "__").LoadHTMLGlob("templates/*.html")
+
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(f.Handler))
 
 	// html
 	router.GET("/", handlers.MainPage)
